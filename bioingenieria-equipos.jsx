@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 import { appStorage } from "./src/storage";
 
 const HOSPITALS_INTERIOR = [
@@ -137,7 +137,7 @@ const PROVEEDORES = [
 ];
 
 // ── Signature Pad Component ──
-function SignaturePad({ onSignatureChange, signatureData }) {
+const SignaturePad = forwardRef(function SignaturePad({ onSignatureChange, signatureData }, ref) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
@@ -163,6 +163,25 @@ function SignaturePad({ onSignatureChange, signatureData }) {
       img.src = signatureData;
     }
   }, []);
+
+  useImperativeHandle(ref, () => ({
+    getData: () => {
+      try {
+        return canvasRef.current?.toDataURL("image/png") || null;
+      } catch (e) {
+        return null;
+      }
+    },
+    clear: () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      const rect = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      setHasSignature(false);
+      onSignatureChange(null);
+    },
+  }));
 
   const getPos = (e) => {
     const canvas = canvasRef.current;
@@ -267,7 +286,97 @@ function SignaturePad({ onSignatureChange, signatureData }) {
       )}
     </div>
   );
+});
+
+// Compress image file to JPEG dataURL (max dimension and quality)
+async function compressImage(file, maxSize = 1200, quality = 0.7) {
+  if (!file) return null;
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      const maxDim = Math.max(width, height);
+      if (maxDim > maxSize) {
+        const scale = maxSize / maxDim;
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      try {
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        URL.revokeObjectURL(url);
+        resolve(dataUrl);
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        reject(err);
+      }
+    };
+    img.onerror = (e) => {
+      URL.revokeObjectURL(url);
+      reject(e);
+    };
+    img.src = url;
+  });
+
 }
+
+function SignatureModal({ open, onClose, onConfirm, initialData }) {
+    const padRef = useRef(null);
+    const [localData, setLocalData] = useState(initialData || null);
+
+    useEffect(() => {
+      if (!open) return;
+      const prevent = (e) => { e.preventDefault(); };
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      window.addEventListener('touchmove', prevent, { passive: false });
+      return () => {
+        document.body.style.overflow = prev;
+        window.removeEventListener('touchmove', prevent);
+      };
+    }, [open]);
+
+    if (!open) return null;
+
+    const modalStyle = {
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      background: '#fff', zIndex: 9999, display: 'flex', flexDirection: 'column',
+      padding: 12, boxSizing: 'border-box'
+    };
+
+    const canvasWrapper = { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' };
+
+    return (
+      <div style={modalStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+          <button onClick={() => { onClose(); }} style={{ padding: '8px 12px' }}>Cancelar</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => { padRef.current?.clear(); setLocalData(null); }} style={{ padding: '8px 12px' }}>Borrar</button>
+            <button onClick={() => {
+              // get data from pad
+              const data = padRef.current?.getData ? padRef.current.getData() : null;
+              onConfirm(data);
+              onClose();
+            }} style={{ padding: '8px 12px' }}>Confirmar firma</button>
+          </div>
+        </div>
+        <div style={canvasWrapper}>
+          <div style={{ width: '100%', height: '100%', maxWidth: 1200, maxHeight: '100%' }}>
+            <SignaturePad
+              ref={padRef}
+              signatureData={initialData}
+              onSignatureChange={(d) => setLocalData(d)}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
 // ── Main App ──
 export default function App() {
@@ -290,7 +399,12 @@ export default function App() {
     recibio: "",
     firma: null,
     foto: null,
+    firmaSessionId: "",
   });
+
+  const [sessionActive, setSessionActive] = useState(false);
+  const [sigModalOpen, setSigModalOpen] = useState(false);
+  const signaturePadRef = useRef(null);
 
   // Load saved config & records from state (persistent storage)
   useEffect(() => {
@@ -309,7 +423,14 @@ export default function App() {
   const saveRecords = async (newRecords) => {
     setRecords(newRecords);
     try {
-      await appStorage.set("records:all", JSON.stringify(newRecords));
+      // Save only text data in history - avoid storing base64 images or signatures
+      const safe = newRecords.map((r) => {
+        const copy = { ...r };
+        delete copy.firma;
+        delete copy.foto;
+        return copy;
+      });
+      await appStorage.set("records:all", JSON.stringify(safe));
     } catch {}
   };
 
@@ -373,6 +494,7 @@ export default function App() {
       recibio: form.recibio,
       firmaPresente: form.firma ? "Sí" : "No",
       fotoPresente: form.foto ? "Sí" : "No",
+      firmaSessionId: form.firmaSessionId || "",
       timestamp: new Date().toLocaleString("es-AR"),
     };
 
@@ -386,31 +508,73 @@ export default function App() {
     if (webhookUrl) {
       setSending(true);
       try {
+        // Prepare payload while keeping compatibility and adding firmaSessionId + reutilizarFirma
+        const payload = {
+          categoria: record.categoria,
+          hospital: record.hospital,
+          ticket: record.ticket,
+          dispositivo: record.dispositivo,
+          serie: record.serie,
+          tipo: record.tipo,
+          fecha: record.fecha,
+          recibio: record.recibio || "",
+          // Send signature only on first submission in session; subsequent submissions reuse it
+          firma: sessionActive ? "" : form.firma || "",
+          foto: form.foto || "",
+          timestamp: Date.now(),
+          firmaSessionId: form.firmaSessionId || "",
+          reutilizarFirma: sessionActive ? true : false,
+        };
+
         await fetch(webhookUrl, {
           method: "POST",
           mode: "no-cors",
-          body: JSON.stringify({
-            ...record,
-            firma: form.firma || "",
-            foto: form.foto || "",
-          }),
+          body: JSON.stringify(payload),
         });
-        if (form.tipo === "Ingreso") {
-          responseMessage = "INGRESO REGISTRADO CORRECTAMENTE";
-          responseTipo = "ingreso";
-        } else {
-          responseMessage = "EGRESO REGISTRADO. Verificar matching en la Sheet.";
-          responseTipo = "egreso_matched";
-        }
+        responseMessage =
+          form.tipo === "Ingreso"
+            ? "INGRESO GUARDADO. Verificar en la Sheet."
+            : "EGRESO GUARDADO. Verificar matching en la Sheet.";
+        responseTipo = form.tipo === "Ingreso" ? "ingreso" : "egreso_matched";
       } catch (err) {
         console.error("Error enviando a Google Sheets:", err);
         responseMessage = "Error al enviar a Google Sheets";
+        responseTipo = "error";
       }
       setSending(false);
     }
 
     setLastResponse({ mensaje: responseMessage, tipo: responseTipo });
     setView("success");
+  };
+
+  const handleSignatureChange = (data) => {
+    // data is a base64 image or null
+    update("firma", data);
+    if (data && !form.firmaSessionId) {
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      update("firmaSessionId", id);
+      setSessionActive(false);
+    }
+    if (!data) {
+      // cleared signature: remove session id and deactivate session
+      update("firmaSessionId", "");
+      setSessionActive(false);
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImage(file, 1200, 0.7);
+      update("foto", compressed);
+    } catch (err) {
+      // fallback to original if compression fails
+      const reader = new FileReader();
+      reader.onload = (ev) => update("foto", ev.target.result);
+      reader.readAsDataURL(file);
+    }
   };
 
   const update = (field, val) => setForm((p) => ({ ...p, [field]: val }));
@@ -785,24 +949,33 @@ export default function App() {
             <div style={{ fontSize: 56, marginBottom: 16 }}>✓</div>
             <h2 style={{ ...titleStyle, fontSize: 22, marginBottom: 8 }}>Registro Guardado</h2>
             <p style={{ color: "#6b8aad", fontSize: 14, marginBottom: 6 }}>
-              {lastResponse.mensaje || (webhookUrl ? "Enviado a Google Sheets correctamente" : "Guardado localmente (Google Sheets no configurado)")}
+              {lastResponse.mensaje || (webhookUrl ? "Se intentó enviar a Google Sheets" : "Guardado localmente (Google Sheets no configurado)")}
             </p>
+            {webhookUrl && (
+              <p style={{ color: "#8ea4bf", fontSize: 12, marginBottom: 10, lineHeight: 1.5 }}>
+                Si en la consola ves 401, el Web App de Apps Script no está público o la URL no corresponde a una
+                implementación activa.
+              </p>
+            )}
             <p style={{ color: "#8ea4bf", fontSize: 13, marginBottom: 28 }}>
               {getCategoryLabel()} → {lastHospital}
             </p>
             <button
               style={primaryBtn}
               onClick={() => {
+                // Continue in the same hospital: keep category, hospital, recibio and signature (visual)
                 setForm((p) => ({
                   ...p,
                   ticketTipo: "",
                   ticket: "",
                   dispositivo: "",
                   serie: "",
-                  recibio: "",
-                  firma: null,
                   foto: null,
+                  // keep recibio and firma and firmaSessionId
+                  // recibio: p.recibio,
+                  // firma: p.firma,
                 }));
+                setSessionActive(true);
                 setView("form");
               }}
             >
@@ -824,6 +997,12 @@ export default function App() {
   return (
     <div style={bg}>
       <style>{fonts}</style>
+      <SignatureModal
+        open={sigModalOpen}
+        onClose={() => setSigModalOpen(false)}
+        onConfirm={(data) => { handleSignatureChange(data); }}
+        initialData={form.firma}
+      />
       <div style={gridOverlay} />
       <div style={container}>
         <button style={backBtn} onClick={() => setView("home")}>← Volver</button>
@@ -951,6 +1130,8 @@ export default function App() {
           <div style={fieldGroup}>
             <label style={labelStyle}>Nº de Serie</label>
             <input
+              type="text"
+              inputMode="numeric"
               style={inputStyle}
               placeholder="Ej: SN-2024-0001"
               value={form.serie}
@@ -972,10 +1153,25 @@ export default function App() {
           {/* Firma */}
           <div style={fieldGroup}>
             <label style={labelStyle}>Firma</label>
-            <SignaturePad
-              signatureData={form.firma}
-              onSignatureChange={(data) => update("firma", data)}
-            />
+            <div
+              onClick={() => setSigModalOpen(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 10,
+                padding: "14px 12px",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 10,
+                cursor: "pointer",
+                color: form.firma ? "#a3d3ff" : "#8ea4bf",
+                fontSize: 15,
+              }}
+            >
+              <span style={{ fontSize: 20 }}>{form.firma ? '🖊️' : '✍️'}</span>
+              <span>{form.firma ? 'Firma cargada - tocar para modificar' : 'Toque para firmar'}</span>
+            </div>
           </div>
 
           {/* Aclaración */}
@@ -1014,13 +1210,7 @@ export default function App() {
                   accept="image/*"
                   capture="environment"
                   style={{ display: "none" }}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (ev) => update("foto", ev.target.result);
-                    reader.readAsDataURL(file);
-                  }}
+                  onChange={handleFileChange}
                 />
               </label>
             ) : (

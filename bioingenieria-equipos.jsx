@@ -137,7 +137,7 @@ const PROVEEDORES = [
 ];
 
 // ── Signature Pad Component ──
-const SignaturePad = forwardRef(function SignaturePad({ onSignatureChange, signatureData }, ref) {
+const SignaturePad = forwardRef(function SignaturePad({ onSignatureChange, signatureData, canvasHeight = 150, compact = false }, ref) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
@@ -232,9 +232,9 @@ const SignaturePad = forwardRef(function SignaturePad({ onSignatureChange, signa
         ref={canvasRef}
         style={{
           width: "100%",
-          height: 150,
-          border: "2px dashed #3d5a80",
-          borderRadius: 12,
+          height: canvasHeight,
+          border: compact ? "2px dashed #3d5a80" : "2px solid #dbe4f0",
+          borderRadius: compact ? 12 : 0,
           background: "#f8fafc",
           cursor: "crosshair",
           touchAction: "none",
@@ -289,7 +289,7 @@ const SignaturePad = forwardRef(function SignaturePad({ onSignatureChange, signa
 });
 
 // Compress image file to JPEG dataURL (max dimension and quality)
-async function compressImage(file, maxSize = 1200, quality = 0.7) {
+async function compressImage(file, maxSize = 960, quality = 0.62) {
   if (!file) return null;
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -344,33 +344,84 @@ function SignatureModal({ open, onClose, onConfirm, initialData }) {
     if (!open) return null;
 
     const modalStyle = {
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: '#fff', zIndex: 9999, display: 'flex', flexDirection: 'column',
-      padding: 12, boxSizing: 'border-box'
+      position: 'fixed',
+      inset: 0,
+      width: '100vw',
+      height: '100dvh',
+      background: '#fff',
+      zIndex: 9999,
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      boxSizing: 'border-box'
     };
 
-    const canvasWrapper = { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' };
+    const canvasWrapper = {
+      flex: 1,
+      minHeight: 0,
+      display: 'flex',
+      alignItems: 'stretch',
+      justifyContent: 'stretch',
+      padding: 12,
+      boxSizing: 'border-box'
+    };
+
+    const actionBar = {
+      display: 'flex',
+      gap: 8,
+      flexWrap: 'wrap',
+      padding: 12,
+      paddingBottom: 8,
+      borderBottom: '1px solid #e5ecf5',
+      background: '#fff',
+      position: 'sticky',
+      top: 0,
+      zIndex: 1,
+    };
+
+    const actionBtn = {
+      padding: '12px 16px',
+      borderRadius: 10,
+      border: '1px solid #dbe4f0',
+      background: '#fff',
+      color: '#1a2744',
+      fontSize: 14,
+      fontWeight: 600,
+      flex: '1 1 120px',
+      minHeight: 48,
+      cursor: 'pointer',
+    };
+
+    const confirmBtn = {
+      ...actionBtn,
+      border: 'none',
+      background: 'linear-gradient(135deg, #2e86de, #48c6ef)',
+      color: '#fff',
+      flex: '2 1 180px',
+    };
 
     return (
       <div style={modalStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-          <button onClick={() => { onClose(); }} style={{ padding: '8px 12px' }}>Cancelar</button>
+        <div style={actionBar}>
+          <button onClick={() => { onClose(); }} style={actionBtn}>Cancelar</button>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => { padRef.current?.clear(); setLocalData(null); }} style={{ padding: '8px 12px' }}>Borrar</button>
+            <button onClick={() => { padRef.current?.clear(); setLocalData(null); }} style={actionBtn}>Borrar</button>
             <button onClick={() => {
               // get data from pad
               const data = padRef.current?.getData ? padRef.current.getData() : null;
               onConfirm(data);
               onClose();
-            }} style={{ padding: '8px 12px' }}>Confirmar firma</button>
+            }} style={confirmBtn}>Confirmar firma</button>
           </div>
         </div>
         <div style={canvasWrapper}>
-          <div style={{ width: '100%', height: '100%', maxWidth: 1200, maxHeight: '100%' }}>
+          <div style={{ width: '100%', height: '100%', minHeight: 0 }}>
             <SignaturePad
               ref={padRef}
               signatureData={initialData}
               onSignatureChange={(d) => setLocalData(d)}
+              canvasHeight="100%"
+              compact={false}
             />
           </div>
         </div>

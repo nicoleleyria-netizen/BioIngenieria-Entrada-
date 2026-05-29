@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 import { appStorage } from "./src/storage";
 
+const DEFAULT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzcDX3C8Fg7SJOtEt0G9Nlx5juYOCUpiX8ey7Ew_oNPMRWmOCPfXxYtgc9qNYCS2WBPjA/exec";
+
 const HOSPITALS_INTERIOR = [
   "Alta Gracia - Arturo U. Illia",
   "Bell Ville - José Antonio Ceballos",
@@ -433,8 +435,8 @@ function SignatureModal({ open, onClose, onConfirm, initialData }) {
 export default function App() {
   const [view, setView] = useState("home"); // home | form | success | config | history
   const [category, setCategory] = useState("");
-  const [webhookUrl, setWebhookUrl] = useState("");
-  const [tempWebhook, setTempWebhook] = useState("");
+  const [webhookUrl, setWebhookUrl] = useState(DEFAULT_WEBHOOK_URL);
+  const [tempWebhook, setTempWebhook] = useState(DEFAULT_WEBHOOK_URL);
   const [sending, setSending] = useState(false);
   const [lastResponse, setLastResponse] = useState({ mensaje: "", tipo: "" });
   const [records, setRecords] = useState([]);
@@ -462,7 +464,10 @@ export default function App() {
     (async () => {
       try {
         const wh = await appStorage.get("config:webhook");
-        if (wh?.value) setWebhookUrl(wh.value);
+        if (wh?.value) {
+          setWebhookUrl(wh.value);
+          setTempWebhook(wh.value);
+        }
       } catch {}
       try {
         const rec = await appStorage.get("records:all");

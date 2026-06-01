@@ -436,7 +436,7 @@ export default function App() {
   const [view, setView] = useState("home"); // home | form | success | config | history
   const [category, setCategory] = useState("");
   const [webhookUrl, setWebhookUrl] = useState(DEFAULT_WEBHOOK_URL);
-  const [tempWebhook, setTempWebhook] = useState(DEFAULT_WEBHOOK_URL);
+
   const [sending, setSending] = useState(false);
   const [lastResponse, setLastResponse] = useState({ mensaje: "", tipo: "" });
   const [records, setRecords] = useState([]);
@@ -463,13 +463,6 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        const wh = await appStorage.get("config:webhook");
-        if (wh?.value) {
-          setWebhookUrl(wh.value);
-          setTempWebhook(wh.value);
-        }
-      } catch {}
-      try {
         const rec = await appStorage.get("records:all");
         if (rec?.value) setRecords(JSON.parse(rec.value));
       } catch {}
@@ -490,13 +483,7 @@ export default function App() {
     } catch {}
   };
 
-  const saveWebhook = async () => {
-    setWebhookUrl(tempWebhook);
-    try {
-      await appStorage.set("config:webhook", tempWebhook);
-    } catch {}
-    setView("home");
-  };
+  
 
   const getHospitalList = () => {
     if (category === "interior") return HOSPITALS_INTERIOR;

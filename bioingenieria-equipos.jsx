@@ -827,9 +827,6 @@ export default function App() {
         <div style={gridOverlay} />
         <div style={container}>
           <div style={topBar}>
-            <button style={smallBtn} onClick={() => { setTempWebhook(webhookUrl); setView("config"); }}>
-              ⚙ Config
-            </button>
             {records.length > 0 && (
               <button style={smallBtn} onClick={() => setView("history")}>
                 📋 Historial ({records.length})
@@ -885,51 +882,6 @@ export default function App() {
             </div>
           </div>
 
-          {!webhookUrl && (
-            <div style={{ ...cardBase, borderLeft: "4px solid #e74c3c", marginTop: 24, padding: 16 }}>
-              <div style={{ fontSize: 13, color: "#e0a07a" }}>
-                ⚠ Google Sheets no configurado.{" "}
-                <span
-                  style={{ textDecoration: "underline", cursor: "pointer", color: "#48c6ef" }}
-                  onClick={() => { setTempWebhook(""); setView("config"); }}
-                >
-                  Configurar ahora
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // CONFIG
-  if (view === "config") {
-    return (
-      <div style={bg}>
-        <style>{fonts}</style>
-        <div style={gridOverlay} />
-        <div style={container}>
-          <button style={backBtn} onClick={() => setView("home")}>← Volver</button>
-          <div style={header}>
-            <h1 style={{ ...titleStyle, fontSize: 22 }}>Configuración</h1>
-            <p style={subtitleStyle}>Google Sheets</p>
-          </div>
-          <div style={cardBase}>
-            <div style={fieldGroup}>
-              <label style={labelStyle}>URL del Web App (Google Apps Script)</label>
-              <input
-                style={inputStyle}
-                placeholder="https://script.google.com/macros/s/..."
-                value={tempWebhook}
-                onChange={(e) => setTempWebhook(e.target.value)}
-              />
-            </div>
-            <p style={{ fontSize: 12, color: "#6b8aad", lineHeight: 1.6, marginBottom: 20 }}>
-              Pegue aquí la URL del script de Google Apps Script que recibe los datos y los escribe en su Google Sheet. Vea las instrucciones para crear el script.
-            </p>
-            <button style={primaryBtn} onClick={saveWebhook}>Guardar</button>
-          </div>
         </div>
       </div>
     );

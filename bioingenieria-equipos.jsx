@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 import { appStorage } from "./src/storage";
 
-const DEFAULT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzcDX3C8Fg7SJOtEt0G9Nlx5juYOCUpiX8ey7Ew_oNPMRWmOCPfXxYtgc9qNYCS2WBPjA/exec";
+const DEFAULT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbztooCA3miugm6r4FIc2OtKEXWQIS1In6BgKCoRmVyaVUG38zRh3nm-NGtt2Qo9zxK4ww/exec";
 
 const HOSPITALS_INTERIOR = [
   "Alta Gracia - Arturo U. Illia",
@@ -10,13 +10,13 @@ const HOSPITALS_INTERIOR = [
   "Corral de Bustos - Pedro Vella",
   "Cruz del Eje - Aurelio Crespo",
   "Dean Fúnes - Ernesto Romagosa",
-  "Despeñaderos - Elpidio Torres",
+  "Despeñaderos - Elpidio Gonzales",
   "Huinca Renancó - René Favaloro",
   "Jesús María - Vicente Agüero",
-  "La Calera - Ramón J. Cárcano",
-  "La Carlota - Arturo Illia",
-  "La Dormida - San Antonio",
-  "Laboulaye - San José de La Dormida",
+  "La Calera - Arturo Illia",
+  "La Carlota - San Antonio",
+  "La Dormida - San Jose de la Dormida ",
+  "Laboulaye - Ramón J. Cárcano",
   "Marcos Juárez - Abel Ayerza",
   "Mina Clavero - Luis María Bellodi",
   "Oliva - Emilio Vidal Abal",
@@ -43,7 +43,7 @@ const HOSPITALS_CAPITAL = [
   "H. De Niños",
   "Oncológico",
   "Pediátrico",
-  "Tránsito",
+  "Tránsito Caseres de Ayende",
   "Rawson",
   "Materno Provincial",
   "Misericordia",
@@ -51,7 +51,6 @@ const HOSPITALS_CAPITAL = [
   "Eva Perón",
   "Materno Neonatal",
   "Florencio Diaz",
-  "Neuropsiquiátrico",
   "Córdoba",
   "Banco de Sangre",
   "CAPS",
@@ -60,7 +59,6 @@ const HOSPITALS_CAPITAL = [
   "Laboratorio Central",
   "Neuropsiquiátrico Provincial",
   "Polo de la Mujer",
-  "Zonal de Oliva",
   "Otro"
 ];
 

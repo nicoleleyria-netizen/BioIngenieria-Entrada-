@@ -448,6 +448,7 @@ export default function App() {
     fecha: new Date().toISOString().slice(0, 10),
     serie: "",
     recibio: "",
+    responsable: "",
     firma: null,
     foto: null,
     firmaSessionId: "",
@@ -559,6 +560,8 @@ export default function App() {
           tipo: record.tipo,
           fecha: record.fecha,
           recibio: record.recibio || "",
+          // Agregar esta línea junto a los otros campos:
+responsable: form.responsable || "",
           // Send signature only on first submission in session; subsequent submissions reuse it
           firma: sessionActive ? "" : form.firma || "",
           foto: form.foto || "",
@@ -1124,7 +1127,7 @@ export default function App() {
             <label style={labelStyle}>Nº de Serie</label>
             <input
               type="text"
-              inputMode="numeric"
+            
               style={inputStyle}
               placeholder="Ej: SN-2024-0001"
               value={form.serie}
@@ -1177,7 +1180,16 @@ export default function App() {
               onChange={(e) => update("recibio", e.target.value)}
             />
           </div>
-
+{/* Responsable */}
+<div style={fieldGroup}>
+  <label style={labelStyle}>Responsable</label>
+  <input
+    style={inputStyle}
+    placeholder="Responsable del área"
+    value={form.responsable || ""}
+    onChange={(e) => update("responsable", e.target.value)}
+  />
+</div>
           {/* Foto */}
           <div style={fieldGroup}>
             <label style={labelStyle}>Foto del Equipo</label>
